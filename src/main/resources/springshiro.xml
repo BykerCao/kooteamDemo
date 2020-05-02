@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd">
+	
+	<bean id="myFormAuthenticationFiter" class="cn.cao.shiro.MyFormAuthenticationFiter">
+	</bean>
+	<!-- 配置自定义退出过滤器 -->
+	<bean id="mylogoutFilter" class="org.apache.shiro.web.filter.authc.LogoutFilter">
+		<property name="redirectUrl" value="/login.jsp" />
+	</bean>
+	<!-- shiroFilter核心过滤器工厂 -->
+	<bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+						<!-- 引入各种自定义过滤器 -->
+						<property name="filters">
+							<map>
+								<entry key="logout" value-ref="mylogoutFilter" />
+								<entry key="authc" value-ref="myFormAuthenticationFiter" />
+							</map>
+						</property>
+		<!-- 认证失败 -->
+		<property name="loginUrl" value="/login.do" />
+		<!-- 认证成功 --><property name="successUrl" value="/index.do" />
+		<!-- 无权访问 --><property name="unauthorizedUrl" value="/index_welcome/unAuthentication.jsp" />
+		<!--安全管理器 --><property name="securityManager" ref="securityManager" />
+		<!-- 过滤器链 --><property name="filterChainDefinitions">
+							<value>
+								/lib/**=anon
+								/static/**=anon
+								/login.jsp=anon
+								/verifyCode.jsp=anon
+								
+								/index.do=user
+								
+								/logout.do=logout
+								
+								/** = authc
+							</value>
+						</property>
+	</bean>
+	<!-- 安全管理器配置重写的验证和授权 -->
+	<bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+		<property name="realm" ref="myCustomRealm" /><!-- 重写验证身份 -->
+		<property name="cacheManager" ref="cacheManager" />	<!-- 登陆验证，然后把身份缓存起来	 -->
+		<property name="sessionManager" ref="sessionManager" />		<!-- 会话管理，超时时间 -->
+		<property name="rememberMeManager" ref="rememberMeManager" /><!-- 记住我 -->
+	</bean>
+	<bean id="myCustomRealm" class="cn.cao.shiro.MyCustomRealm">
+		<property name="credentialsMatcher" ref="credentialsMatcher" />
+	</bean><!-- 适配器加密 -->
+	<bean id="credentialsMatcher" class="org.apache.shiro.authc.credential.HashedCredentialsMatcher">
+		<property name="hashAlgorithmName" value="MD5"/>
+		<property name="hashIterations" value="3" />
+	</bean>
+	<bean id="cacheManager"	class="org.apache.shiro.cache.ehcache.EhCacheManager" >
+		<property name="cacheManagerConfigFile" value="classpath:shiro-ehcache.xml" />
+	</bean>
+	<bean id="sessionManager" class="org.apache.shiro.web.session.mgt.DefaultWebSessionManager">
+		<property name="globalSessionTimeout" value="#{1000*60*10}" /><!-- 毫秒为单位 -->
+		<property name="deleteInvalidSessions" value="true" /><!-- 删除无用的session -->
+	</bean>
+	<bean id="rememberMeManager" class="org.apache.shiro.web.mgt.CookieRememberMeManager">
+		<property name="cookie">
+			<bean class="org.apache.shiro.web.servlet.SimpleCookie">
+				<constructor-arg value="rememberMe" />
+				<property name="maxAge" value="#{3600*24*3}" />
+			</bean>
+		</property>
+	</bean>
+	<!-- 设置记住我以后，shiro框架是默认session验证，要把记住我的cookie加载到session中,在自定义过滤器中设置MyFormAuthenticationFiter -->
+	
+	<aop:config proxy-target-class="true" /><!-- 开启spring代理权限 	下面开启shiro注解	-->
+	<bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">
+		<property name="securityManager" ref="securityManager" /><!-- 注入安全管理器	 -->
+	</bean>
+	<bean class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver"><!-- 无权限异常拦截 -->
+		<property name="exceptionMappings">
+			<props>
+				<prop key="org.apache.shiro.authz.UnauthorizedException">index_welcome/unAuthentication</prop>
+			</props>
+		</property>
+	</bean>
+	
+</beans>

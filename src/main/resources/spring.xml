@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+
+	<!-- 配置包扫描位置 -->
+	<context:component-scan base-package="cn.cao" />
+
+	<!-- 读取 db.properties数据库配置文件 -->
+	<context:property-placeholder
+		location="classpath:db.properties" />
+
+	<!-- 配置 druid 连接池 -->
+	<bean id="dataSource"
+		class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+		<property name="driverClassName"
+			value="${jdbc.driverClassName}" />
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.username}" />
+		<property name="password" value="${jdbc.password}" />
+		<property name="maxActive" value="${jdbc.maxActive}" />
+	</bean>
+
+	<!-- 配置SqlSessionFactory对象的创建 -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<!-- 分页插件 -->
+		<property name="plugins">
+			<array>
+				<bean class="com.github.pagehelper.PageInterceptor">
+					<property name="properties">
+						<value>
+							helperDialect=mysql
+						</value>
+					</property>
+				</bean>
+			</array>
+		</property>
+		
+		<property name="dataSource" ref="dataSource" /><!--	数据源 -->
+		<property name="typeAliasesPackage" value="cn.cao.pojo" /><!-- 配置别名 -->
+		<property name="mapperLocations"><!-- 配置映射文件【可以省略】 -->
+			<array>
+				<value>classpath:cn/cao/mapper/*Mapper.xml</value>
+			</array>
+		</property>
+		<!-- 下方读取classpath:mybatis-config.xml配置文件，无论里面有没有东西，都要有 <configuration> </configuration>标签  -->		
+		<!-- <property name="configLocation" value="classpath:mybatis-config.xml" /> --><!-- 读取Mybatis配置文件 -->
+	</bean>
+
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="basePackage" value="cn.cao.mapper" /><!-- 配置包扫描创建代理对象的位置 -->
+		<property name="sqlSessionFactoryBeanName"	value="sqlSessionFactory" /><!-- 配置sqlSessionFactory 工厂的名称【可省略】  -->
+	</bean>
+
+
+	<!-- MyBatis的事务配置 -->
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" /><!-- 注入数据源 -->
+	</bean>
+
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<tx:method name="select*" read-only="true" propagation="REQUIRED" />
+			<tx:method name="*" read-only="false" />
+		</tx:attributes>
+	</tx:advice>
+	<aop:config>
+		<aop:pointcut
+			expression="execution(* cn.cao.service.impl.*.*(..))" id="pt" />
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="pt" />
+	</aop:config>
+	
+	<!-- 引入其他配置 -->
+	<!-- <import resource="classpath:springmvc.xml"/> -->
+	
+</beans>
